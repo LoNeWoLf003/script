@@ -1,32 +1,29 @@
-from flask import Flask, request, jsonify, send_file
+from fastapi import FastAPI, UploadFile, File
 from rembg import remove
 from PIL import Image
+import io
 
-app = Flask(__name__)
+app = FastAPI()
 
-@app.route('/remove_background', methods=['POST'])
-def remove_background():
+@app.post("/remove_background/")
+async def remove_background(image: UploadFile = File(...)):
     try:
-        # Get the image file from the POST request
-        image_file = request.files.get('image')
-
-        if image_file is None:
-            return jsonify({'error': 'No image file provided'}), 400
-
-        # Load the image using PIL
-        image = Image.open(image_file)
+        # Load the uploaded image using PIL
+        image_bytes = await image.read()
+        input_image = Image.open(io.BytesIO(image_bytes))
 
         # Remove background using rembg
-        output = remove(image)
+        output_image = remove(input_image)
 
-        # Create a response with the processed image
+        # Save the output image to a BytesIO buffer
         output_buffer = io.BytesIO()
-        output.save(output_buffer, format='PNG')
+        output_image.save(output_buffer, format='PNG')
         output_buffer.seek(0)
 
-        return send_file(output_buffer, mimetype='image/png')
+        return {"image": output_buffer}
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return {"error": str(e)}
 
-if __name__ == '__main__':
-    app.run(debug=True)
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=8000)
